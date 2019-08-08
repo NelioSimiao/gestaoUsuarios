@@ -1,75 +1,149 @@
 class UserController {
-  constructor (formId, tableId) {
-    this.formE1 = document.getElementById(formId)
-    this.tableIdE1 = document.getElementById(tableId)
-    this.onSubmit()
+  constructor(formIdCreate, formIdUpdate, tableId) {
+    this.formE1 = document.getElementById(formIdCreate);
+    this.formUpdateE1 = document.getElementById(formIdUpdate);
+    this.tableIdE1 = document.getElementById(tableId);
+    this.onSubmit();
+    this.onEditCancel();
   }
 
-  onSubmit () {
-    this.formE1.addEventListener('submit', event => {
-      event.preventDefault()
+  onEditCancel() {
+    document
+      .querySelector("#box-user-update .btn-cancel")
+      .addEventListener("click", e => {
+        this.showCreateUser();
+      });
 
-      let values = this.getValues()
+    this.formUpdateE1.addEventListener("submit", event => {
+      event.preventDefault();
+      let btn = this.formUpdateE1.querySelector("[type=submit]");
+      btn.disabled = true;
+      let values = this.getValues("#form-user-update [name]");
 
-      this.getPhoto().then(
+      let index = this.formUpdateE1.dataset.trIndex;
 
-          (content)=> {
-           values.photo = content
-            this.addLine(values)
+      let tr = this.tableIdE1.rows[index];
 
-          },
-          function(e){
-              console.error(e);
+      let userOld = JSON.parse(tr.dataset.user);
 
+      let result = Object.assign({}, userOld, values);
+
+      //  tr.dataset.user = JSON.stringify(result);
+
+      this.getPhoto(this.formUpdateE1).then(
+        content => {
+          if (values._photo == "") {
+            result._photo = userOld._photo;
+          } else {
+            result._photo = content;
           }
-         );
-    })
-  }
- // para fazer up
-  getPhoto () {
-    return new Promise( (resolve, reject)=> {
-      let fileReader = new FileReader()
-      let elements = [...this.formE1.elements].filter(item => {
-        if (item.name === 'photo') {
-          return item
+          tr.dataset.user = JSON.stringify(result);
+
+          tr.innerHTML = `<td><img src="${
+            result._photo
+          }" alt="User Image" class="img-circle img-sm"> </td>
+                      <td>${result._name}</td>
+                      <td>${result._email}</td>
+                      <td>${result._admin ? "Sim" : "Não"}</td>
+                      <td>${Utils.dateFormat(result._register)}</td>
+                      <td>
+                      <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
+                      <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
+                       </td>`;
+
+          this.addEventsTr(tr);
+          this.updateCount();
+
+          this.formUpdateE1.reset();
+          btn.disabled = false;
+          this.showCreateUser();
+        },
+        function(e) {
+          console.error(e);
         }
-      })
+      );
+    });
+  }
+  onSubmit() {
+    this.formE1.addEventListener("submit", event => {
+      event.preventDefault();
+      let btn = this.formE1.querySelector("[type=submit]");
+      btn.disabled = true;
+      let values = this.getValues("#form-user-create [name]");
+      // aqui é quando se para as validações
+      if (!values) {
+        btn.disabled = false;
+        return false;
+      }
+
+      this.getPhoto(this.formE1).then(
+        content => {
+          values.photo = content;
+          this.addLine(values);
+          this.formE1.reset();
+          btn.disabled = false;
+        },
+        function(e) {
+          console.error(e);
+        }
+      );
+    });
+  }
+
+  // para fazer up
+  getPhoto(formE1) {
+    return new Promise((resolve, reject) => {
+      let fileReader = new FileReader();
+      let elements = [...formE1.elements].filter(item => {
+        if (item.name === "photo") {
+          return item;
+        }
+      });
       let file = elements[0].files[0];
 
       fileReader.onload = () => {
         resolve(fileReader.result);
-      }
+      };
 
       fileReader.onerror = e => {
         reject(e);
-      }
+      };
 
-      if(file){
+      if (file) {
         fileReader.readAsDataURL(file);
-
-      }else{
-        resolve('dist/img/boxed-bg.jpg');
-   
+      } else {
+        resolve("dist/img/boxed-bg.jpg");
       }
-    })
+    });
   }
 
-
-
-
-  
   // extraindo dados do formulario
-  getValues () {
-    let user = {}
-    this.getElements().forEach(function (field, index) {
-      if (field.name == 'gender') {
-        if (field.checked) {
-          user[field.name] = field.value
-        }
-      } else {
-        user[field.name] = field.value
+  getValues(formID) {
+    let user = {};
+    let isValid = true;
+    this.getElements(formID).forEach(function(field, index) {
+      if (
+        ["name", "email", "password"].indexOf(field.name) > -1 &&
+        !field.value
+      ) {
+        field.parentElement.classList.add("has-error");
+        isValid = false;
       }
-    })
+
+      if (field.name == "gender") {
+        if (field.checked) {
+          user[field.name] = field.value;
+        }
+      }
+      if (field.name == "admin") {
+        user[field.name] = field.checked;
+      } else {
+        user[field.name] = field.value;
+      }
+    });
+    if (!isValid) {
+      return false;
+    }
 
     return new User(
       user.name,
@@ -80,31 +154,91 @@ class UserController {
       user.password,
       user.photo,
       user.admin
-    )
+    );
   }
   // adicionando linha na tabela dos usuarios
-  addLine (dataUser) {
-    this.tableIdE1.innerHTML = `
-              <tr>
-                   <td>
-                        <img src="${
-  dataUser.photo
-}" alt="User Image" class="img-circle img-sm">
-                        </td>
-                        <td>${dataUser.name}</td>
-                        <td>${dataUser.email}</td>
-                        <td>${dataUser.admin}</td>
-                        <td>${dataUser.birth}</td>
-                        <td>
-                        <button type="button" class="btn btn-primary btn-xs btn-flat">Editar</button>
-                        <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
-                     </td>
-              </tr>`
+  addLine(dataUser) {
+    let tr = document.createElement("tr");
 
-    console.log(dataUser)
+    tr.dataset.user = JSON.stringify(dataUser);
+
+    tr.innerHTML = `<td><img src="${
+      dataUser.photo
+    }" alt="User Image" class="img-circle img-sm"> </td>
+                    <td>${dataUser.name}</td>
+                    <td>${dataUser.email}</td>
+                    <td>${dataUser.admin ? "Sim" : "Não"}</td>
+                    <td>${Utils.dateFormat(dataUser.register)}</td>
+                    <td>
+                    <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
+                    <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
+                     </td>`;
+
+    this.addEventsTr(tr);
+    this.tableIdE1.appendChild(tr);
+    this.updateCount();
   }
 
-  getElements () {
-    return document.querySelectorAll('#form-user-create [name]')
+  updateCount() {
+    let numberUsers = 0;
+    let numberAdmin = 0;
+    [...this.tableIdE1.children].forEach(tr => {
+      numberUsers++;
+      let user = JSON.parse(tr.dataset.user);
+      if (user._admin) {
+        numberAdmin++;
+      }
+    });
+    document.getElementById("number-users").innerHTML = numberUsers;
+    document.getElementById("number-users-admin").innerHTML = numberAdmin;
+  }
+
+  showCreateUser() {
+    document.querySelector("#box-user-create").style.display = "block";
+    document.querySelector("#box-user-update").style.display = "none";
+  }
+
+  showEditUser() {
+    document.querySelector("#box-user-update").style.display = "block";
+    document.querySelector("#box-user-create").style.display = "none";
+  }
+
+  getElements(id) {
+    return document.querySelectorAll(id);
+  }
+  //adiciona o evento editar no botao da linha
+  addEventsTr(tr) {
+    tr.querySelector(".btn-edit").addEventListener("click", e => {
+      let json = JSON.parse(tr.dataset.user);
+      //guardando o index
+      this.formUpdateE1.dataset.trIndex = tr.sectionRowIndex;
+
+      //Laço para percorrer objetos.
+      for (let name in json) {
+        let field = this.formUpdateE1.querySelector(
+          "[name=" + name.replace("_", "") + "]"
+        );
+        if (field) {
+          switch (field.type) {
+            case "file":
+              continue;
+              break;
+            case "radio":
+              field = this.formUpdateE1.querySelector(
+                "[name=" + name.replace("_", "") + "][value=" + json[name] + "]"
+              );
+              field.checked = true;
+              break;
+            case "checkbox":
+              field.checked = json[name];
+              break;
+          }
+          field.value = json[name];
+        }
+      }
+      this.formUpdateE1.querySelector(".photo").src = json._photo;
+
+      this.showEditUser();
+    });
   }
 }
