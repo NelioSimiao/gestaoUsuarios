@@ -5,6 +5,7 @@ class UserController {
     this.tableIdE1 = document.getElementById(tableId);
     this.onSubmit();
     this.onEditCancel();
+    this.selectAll();
   }
 
   onEditCancel() {
@@ -37,21 +38,11 @@ class UserController {
           } else {
             result._photo = content;
           }
-          tr.dataset.user = JSON.stringify(result);
 
-          tr.innerHTML = `<td><img src="${
-            result._photo
-          }" alt="User Image" class="img-circle img-sm"> </td>
-                      <td>${result._name}</td>
-                      <td>${result._email}</td>
-                      <td>${result._admin ? "Sim" : "Não"}</td>
-                      <td>${Utils.dateFormat(result._register)}</td>
-                      <td>
-                      <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
-                      <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
-                       </td>`;
+          let user = new User();
+          user.onloadFromJSON(result);
 
-          this.addEventsTr(tr);
+          this.getTr(user, tr);
           this.updateCount();
 
           this.formUpdateE1.reset();
@@ -80,9 +71,13 @@ class UserController {
         content => {
           values.photo = content;
           this.addLine(values);
+          //insere no sessionStorage
+          this.insert(values);
+
           this.formE1.reset();
           btn.disabled = false;
         },
+
         function(e) {
           console.error(e);
         }
@@ -156,10 +151,39 @@ class UserController {
       user.admin
     );
   }
+  getUserStorage() {
+    let users = [];
+    if (sessionStorage.getItem("users")) {
+      users = JSON.parse(sessionStorage.getItem("users"));
+    }
+    return users;
+  }
+
+  selectAll() {
+    let users = this.getUserStorage();
+    users.forEach(dataUser => {
+      let user = new User();
+      user.onloadFromJSON(dataUser);
+      this.addLine(user);
+    });
+  }
+
+  insert(data) {
+    let users = this.getUserStorage();
+    users.push(data);
+    sessionStorage.setItem("users", JSON.stringify(users));
+  }
   // adicionando linha na tabela dos usuarios
   addLine(dataUser) {
-    let tr = document.createElement("tr");
+    let tr = this.getTr(dataUser);
 
+    this.tableIdE1.appendChild(tr);
+
+    this.updateCount();
+  }
+
+  getTr(dataUser, tr = null) {
+    if (tr === null) tr = document.createElement("tr");
     tr.dataset.user = JSON.stringify(dataUser);
 
     tr.innerHTML = `<td><img src="${
@@ -171,12 +195,11 @@ class UserController {
                     <td>${Utils.dateFormat(dataUser.register)}</td>
                     <td>
                     <button type="button" class="btn btn-primary btn-edit btn-xs btn-flat">Editar</button>
-                    <button type="button" class="btn btn-danger btn-xs btn-flat">Excluir</button>
+                    <button type="button" class="btn btn-danger btn-delete btn-xs btn-flat">Excluir</button>
                      </td>`;
 
     this.addEventsTr(tr);
-    this.tableIdE1.appendChild(tr);
-    this.updateCount();
+    return tr;
   }
 
   updateCount() {
@@ -208,6 +231,12 @@ class UserController {
   }
   //adiciona o evento editar no botao da linha
   addEventsTr(tr) {
+    tr.querySelector(".btn-delete").addEventListener("click", e => {
+      if (confirm("Deseja realmente excluir ?")) {
+        tr.remove();
+        this.updateCount();
+      }
+    });
     tr.querySelector(".btn-edit").addEventListener("click", e => {
       let json = JSON.parse(tr.dataset.user);
       //guardando o index
